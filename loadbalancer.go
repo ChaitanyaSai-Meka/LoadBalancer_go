@@ -2,11 +2,14 @@ package main
 
 import (
 	"net/http/httputil"
+	"os"
 	"net/http"
 	"net/url"
 	"sync"
 	"log"
 	"time"
+	"strings"
+	"github.com/joho/godotenv"
 )
 
 type Backend struct {
@@ -151,15 +154,27 @@ func (lb *LoadBalancer) getStats() {
 }
 
 func main(){
+
+	en := godotenv.Load()
+	if en != nil {
+		log.Println("[WARN] No .env file found, using system environment variables")
+	}
+	
+	Port:=os.Getenv("PORT")
+	backendsEnv:=os.Getenv("Backend_URLs")
+
+	if backendsEnv == "" {
+		log.Fatal("Backend_URLs environment variable not set")
+	}
+	if Port == "" {
+		log.Fatal("PORT environment variable not set")
+	}
+
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)  
 	
 	log.Println("[INFO] Starting load balancer...")
 	
-	backendURLs := []string{
-		"http://localhost:8081",
-		"http://localhost:8082",
-		"http://localhost:8083",
-	}
+	backendURLs := strings.Split(backendsEnv, ",")
 	
 	lb := NewLoadBalancer(backendURLs)
 	
@@ -178,10 +193,10 @@ func main(){
 		}
 	}()
 	
-	log.Printf("[INFO] Load balancer listening on :8080\n")
+	log.Printf("[INFO] Load balancer listening on :%s\n", Port)
 	log.Printf("[INFO] Configured %d backend servers\n", len(lb.backends))
 	
-	err := http.ListenAndServe(":8080", lb)
+	err := http.ListenAndServe(":"+Port, lb)
 	if err != nil {
 		log.Fatalf("[FATAL] Server failed to start: %v\n", err)
 	}
